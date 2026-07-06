@@ -20,7 +20,7 @@ SETUP_ONLY=false
 FORCE_DOWNLOAD=false
 
 # Replace this once your Zenodo record is final.
-CUSTOM_RESOURCES_URL="https://zenodo.org/record/XXXXXXX/files/resources.tar.gz"
+CUSTOM_RESOURCES_URL="https://zenodo.org/record/21217549/files/resources.tar.gz"
 
 # Replace these if the official URLs differ.
 LASER_URL="https://csg.sph.umich.edu/chaolong/LASER/LASER-2.04.tar.gz"

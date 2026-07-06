@@ -17,7 +17,7 @@ The following command-line tools are required:
 - `samtools`
 - GNU `parallel`
 - `Rscript`
-- `python2`
+- `python3`
 - `tar`
 - `gzip`
 - `curl` or `wget`

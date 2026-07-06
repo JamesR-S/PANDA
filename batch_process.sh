@@ -35,7 +35,7 @@ REFERENCE_COORD="${RESOURCE_DIR}/reference/New_Ref_800k.RefPC.coord"
 
 LASER_DIR="${BIN_DIR}/LASER-2.04"
 LASER_EXE="${LASER_DIR}/laser"
-PILEUP2SEQ="${LASER_DIR}/pileup2seq/pileup2seq.py"
+PILEUP2SEQ="${BIN_DIR}/pileup3seq.py"
 CLASSIFICATION_SCRIPT="${BIN_DIR}/classification.rscript"
 
 TEMP_DIR=""
@@ -219,7 +219,7 @@ download_and_prepare_resources() {
 
     info "Checking LASER."
 
-    if [[ "$FORCE_DOWNLOAD" == true || ! -x "$LASER_EXE" || ! -f "$PILEUP2SEQ" ]]; then
+    if [[ "$FORCE_DOWNLOAD" == true || ! -x "$LASER_EXE" ]]; then
         download_file "$LASER_URL" "$laser_archive"
 
         info "Extracting LASER archive."
@@ -446,7 +446,7 @@ find "$PILEUP_DIR" -type f -name "*.pileup" | sort | split -l "$BATCH_SIZE" - "$
 parallel \
     --halt soon,fail=1 \
     -j "$THREADS" \
-    'batch=$(cat "{}"); python2 "$PILEUP2SEQ" -m "$REFERENCE_SITE" -o "{.}_800k" $batch; rm "{}"' \
+    'batch=$(cat "{}"); python3 "$PILEUP2SEQ" -m "$REFERENCE_SITE" -o "{.}_800k" $batch; rm "{}"' \
     ::: "${TEMP_DIR}"/temp_batch_*
 
 info ".seq files created."

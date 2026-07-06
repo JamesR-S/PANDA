@@ -28,7 +28,7 @@ Example conda installation for dependencies:
 
 ```bash
 conda create -n PANDA --strict-channel-priority \
-  conda-forge::python=2.7 \
+  conda-forge::python=3.10 \
   conda-forge::r-base \
   conda-forge::r-randomforest \
   bioconda::samtools \

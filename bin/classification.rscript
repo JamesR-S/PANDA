@@ -1,0 +1,213 @@
+#!/usr/bin/env Rscript
+
+
+# Helper functions
+
+message_info <- function(...) {
+  message("[INFO] ", ...)
+}
+
+message_error <- function(...) {
+  message("[ERROR] ", ...)
+}
+
+check_required_packages <- function(packages, local_lib) {
+  available_libs <- unique(c(local_lib, .libPaths()))
+  installed <- rownames(installed.packages(lib.loc = available_libs))
+
+  missing <- setdiff(packages, installed)
+
+  if (length(missing) > 0) {
+    message_error("Missing required R package(s): ", paste(missing, collapse = ", "))
+    message("")
+    message("To install them, run the following command in R:")
+    message("")
+    message("  install.packages(",
+            paste0("c(", paste(sprintf('"%s"', missing), collapse = ", "), ")"),
+            ", lib = \"", local_lib, "\", dependencies = TRUE)")
+    message("")
+    message("If the library directory does not exist, create it first with:")
+    message("")
+    message("  dir.create(\"", local_lib, "\", recursive = TRUE)")
+    message("")
+    quit(status = 1)
+  }
+
+  invisible(TRUE)
+}
+
+load_required_packages <- function(packages, local_lib) {
+  for (pkg in packages) {
+    ok <- suppressPackageStartupMessages(
+      require(pkg, character.only = TRUE, lib.loc = local_lib, quietly = TRUE)
+    )
+
+    if (!ok) {
+      ok <- suppressPackageStartupMessages(
+        require(pkg, character.only = TRUE, quietly = TRUE)
+      )
+    }
+
+    if (!ok) {
+      message_error("Package '", pkg, "' is installed but could not be loaded.")
+      quit(status = 1)
+    }
+  }
+}
+
+
+# Package setup
+
+
+r_version <- paste0(R.version$major, ".", R.version$minor)
+local_lib <- file.path("~", "R", paste0(R.version$platform, "-library"), r_version)
+local_lib <- path.expand(local_lib)
+
+required_packages <- c("randomForest")
+
+check_required_packages(required_packages, local_lib)
+load_required_packages(required_packages, local_lib)
+
+
+# Argument handling
+
+
+args <- commandArgs(trailingOnly = TRUE)
+
+if (length(args) != 3) {
+  message_error("Incorrect number of arguments.")
+  message("")
+  message("Usage:")
+  message("  Rscript classify.R <input.tsv> <probability_threshold> <output.tsv>")
+  message("")
+  message("Example:")
+  message("  Rscript classify.R pcs.tsv 0.8 predictions.tsv")
+  quit(status = 1)
+}
+
+input_file <- args[1]
+probability_threshold <- suppressWarnings(as.numeric(args[2]))
+output_file <- args[3]
+
+if (!file.exists(input_file)) {
+  message_error("Input file does not exist: ", input_file)
+  quit(status = 1)
+}
+
+if (is.na(probability_threshold) || probability_threshold < 0 || probability_threshold > 1) {
+  message_error("Probability threshold must be a number between 0 and 1.")
+  quit(status = 1)
+}
+
+
+# Locate model
+
+
+args_all <- commandArgs(trailingOnly = FALSE)
+file_arg <- args_all[grep("^--file=", args_all)]
+
+if (length(file_arg) == 0) {
+  message_error("Could not determine script path. Please run this script using Rscript.")
+  quit(status = 1)
+}
+
+script_path <- normalizePath(sub("^--file=", "", file_arg))
+script_dir <- dirname(script_path)
+model_path <- file.path(script_dir, "../resources/classification_model.RData")
+
+if (!file.exists(model_path)) {
+  message_error("Classification model not found at: ", model_path)
+  quit(status = 1)
+}
+
+
+# Read input data
+
+
+message_info("Reading input file: ", input_file)
+
+mydata <- read.table(
+  input_file,
+  header = TRUE,
+  sep = "\t",
+  stringsAsFactors = FALSE,
+  check.names = FALSE
+)
+
+if (!"indivID" %in% colnames(mydata)) {
+  message_error("Input file must contain a column named 'indivID'.")
+  quit(status = 1)
+}
+
+rows_with_na <- apply(mydata, MARGIN = 1, FUN = function(x) any(is.na(x)))
+
+n_missing <- sum(rows_with_na)
+
+message_info(
+  n_missing,
+  " individual(s) with missing PC data. IDs saved to unprocessed_ids.txt"
+)
+
+write.table(
+  mydata$indivID[rows_with_na],
+  "unprocessed_ids.txt",
+  quote = FALSE,
+  sep = "\t",
+  row.names = FALSE,
+  col.names = FALSE
+)
+
+mydata <- mydata[!rows_with_na, ]
+
+if (nrow(mydata) == 0) {
+  message_error("No complete rows remain after removing individuals with missing PC data.")
+  quit(status = 1)
+}
+
+
+# Load model and predict
+
+
+message_info("Loading classification model: ", model_path)
+load(model_path)
+
+if (!exists("final_model")) {
+  message_error("The model file does not contain an object named 'final_model'.")
+  quit(status = 1)
+}
+
+message_info("Generating predictions.")
+
+predictions <- predict(final_model, newdata = mydata)
+predicted_probs <- predict(final_model, newdata = mydata, type = "prob")
+
+predicted_probs_max <- apply(predicted_probs, 1, max, na.rm = TRUE)
+predicted_probs <- as.data.frame(predicted_probs)
+
+prediction_levels <- c("afr", "amr", "eas", "fin", "mid", "nfe", "sas", "oth")
+predictions <- factor(predictions, levels = prediction_levels)
+
+predictions[predicted_probs_max < probability_threshold] <- "oth"
+
+predicted_probs$prediction <- predictions
+predicted_probs$id <- mydata$indivID
+
+# Put ID and prediction first, followed by probability columns
+predicted_probs <- predicted_probs[, c("id", setdiff(names(predicted_probs), c("id", "prediction")), "prediction")]
+
+
+# Write output
+
+
+message_info("Writing predictions to: ", output_file)
+
+write.table(
+  predicted_probs,
+  output_file,
+  quote = FALSE,
+  sep = "\t",
+  row.names = FALSE,
+  col.names = TRUE
+)
+
+message_info("Done.")

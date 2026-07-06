@@ -24,18 +24,17 @@ The following command-line tools are required:
 
 The R package `randomForest` is also required.
 
-Install it in R with:
-
-```r
-install.packages("randomForest", dependencies = TRUE)
-```
-
-Example conda installation for command-line dependencies:
+Example conda installation for dependencies:
 
 ```bash
-conda install -c bioconda samtools parallel
-conda install -c conda-forge r-base
-conda install -c conda-forge python=2.7
+conda create -n PANDA --strict-channel-priority \
+  conda-forge::python=2.7 \
+  conda-forge::r-base \
+  conda-forge::r-randomforest \
+  bioconda::samtools \
+  bioconda::parallel
+
+conda activate PANDA
 ```
 
 ## Resources
